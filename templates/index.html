@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Labeling</title>
+    <style>
+        body, html {
+            height: 100%;
+            width: auto;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f4f4f4;
+        }
+
+        #container {
+            min-width: 600px;
+            max-width: 600px;
+            height: auto;
+            border: 2px solid #000;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        #navigationButtons {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .nav-button {
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            padding: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #textToLabel {
+            min-height: 150px;
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #fafafa;
+        }
+
+        #labelButtons {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        button {
+            width: 15%;
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        /* Media Query for Mobile Devices */
+        @media (max-width: 600px) {
+            #container {
+                min-width: unset;
+                max-width: unset;
+                margin: 0; /* Removes horizontal margins */
+                padding: 0; /* Reduces padding to 0 */
+                border: none; /* Removes the border */
+                box-shadow: none; /* Removes the shadow */
+                background-color: transparent; /* Makes background transparent */
+                width: 100%; /* Ensures the container takes full width */
+            }
+
+            body, html {
+                height: auto;
+                background-color: #fff; /* Keeps the background color consistent */
+                padding: 0; /* Removes padding to utilize full screen width */
+            }
+
+            #textToLabel, #labelButtons, #header {
+                padding: 5px; /* Adds minimal padding inside the container for some spacing */
+            }
+
+            button, input[type="email"] {
+                margin: 2px 0; /* Adjusts margin for buttons and input for better layout */
+            }
+        }
+    </style>
+</head>
+<body>
+<div id="container">
+    <div id="header">
+        <div>Progress: {{ current_task }} / {{ total_task }}</div>
+        <div>{{ email }}</div>
+    </div>
+
+    <div id="navigationButtons">
+        <button class="nav-button" onclick="navigateBackward()">&#9664;</button>
+        <button class="nav-button" onclick="navigateForward()">&#9654;</button>
+    </div>
+
+    <div id="textToLabel">
+        <p>{{ text_paragraph }}</p>
+    </div>
+
+    <div id="labelButtons">
+        <button onclick="postLabel(1)">1</button>
+        <button onclick="postLabel(2)">2</button>
+        <button onclick="postLabel(3)">3</button>
+        <button onclick="postLabel(4)">4</button>
+        <button onclick="postLabel(5)">5</button>
+        <button onclick="postLabel(0)">Not Dream</button>
+    </div>
+</div>
+
+<script>
+    // Function to post data to /label
+    function postLabel(label) {
+        fetch('/label', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'label=' + label
+        }).then(response => {
+            if (response.ok) {
+                console.log('Label posted successfully');
+                location.reload();
+            } else {
+                console.error('Failed to post label');
+            }
+        }).catch(error => {
+            console.error('Error:', error);
+        });
+    }
+
+    function navigateForward() {
+        // Implement the forward navigation logic here
+        console.log('Navigating forward');
+    }
+
+    function navigateBackward() {
+        // Implement the backward navigation logic here
+        console.log('Navigating backward');
+    }
+    document.addEventListener('keydown', function (event) {
+        const key = event.key;
+        if (key >= '0' && key <= '5') {
+            postLabel(key);
+        } else if (key === 'ArrowRight') {
+            navigateForward();
+        } else if (key === 'ArrowLeft') {
+            navigateBackward();
+        }
+    });
+</script>
+</body>
+</html>
