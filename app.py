@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from markupsafe import Markup
@@ -26,6 +26,15 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
+with open('option_labels.json', 'r') as json_file:
+    option_label = json.load(json_file)
+
+# Convert keys to integers
+option_label = {int(k): v for k, v in option_label.items()}
+
+# Load credentials from JSON file
+with open('credentials.json') as f:
+    credentials = json.load(f)
 
 class User(db.Model, UserMixin):
     id = db.Column(db.String(120), primary_key=True)
@@ -95,26 +104,40 @@ def index():
             df = pd.read_csv(labeled_csv_path)
         else:
             df = pd.read_csv(csv_path)
+            df['Label'] = None
 
-        if user.currently_labeling >= len(df):
-            user.completed = 1
-            db.session.commit()
-            return render_template("completed.html")
+        l = len(df)
+        if user.currently_labeling >= l:
+            if df["Label"].isnull().any():
+                first_null_row_index = df["Label"].isnull().idxmax()
+                user.currently_labeling = int(df.loc[first_null_row_index, 'Index'] - df['Index'].iloc[0])
+                db.session.commit()
+                return render_template("unlabeled_entries.html")
+            else:
+                user.completed = 1
+                db.session.commit()
+                return render_template("completed.html")
+
         current_index = user.currently_labeling + df['Index'].iloc[0]
         text_paragraph = df[df['Index'] == current_index]['Post'].values[0]
-        l = len(df)
-        del df
+        last_labeled_as = str(df[df['Index'] == current_index]['Label'].values[0])
+        try:
+            last_labeled_as = int(float(last_labeled_as))
+            last_labeled_as = option_label[last_labeled_as]
+        except ValueError:
+            last_labeled_as = "Unlabeled"
 
         return render_template('index.html', text_paragraph=render_unicode_text(text_paragraph),
                                current_task=user.currently_labeling + 1,
                                total_task=l,
+                               last_labeled_as=last_labeled_as,
                                email=current_user.id)
     else:
         return render_template('login.html', client_id=CLIENT_ID)
 
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+@app.route('/google_login', methods=['GET', 'POST'])
+def google_login():
     if request.method == 'POST':
         token = request.json['auth_code']
         try:
@@ -132,8 +155,20 @@ def login():
                 return jsonify({'result': 'failure'})
         except Exception as e:
             raise e
-    return render_template('login.html')
+    return render_template('login.html', client_id=CLIENT_ID)
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        if email in credentials and credentials[email] == password:
+            user = load_user(email)
+            login_user(user)
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password', 'danger')
+    return render_template('login.html')
 
 @app.route('/label', methods=['POST'])
 @login_required
@@ -159,6 +194,82 @@ def label():
     df.to_csv(labeled_csv_path, index=False)
     del df
 
+    return jsonify({'result': 'success'})
+
+
+@app.route('/goto', methods=['POST'])
+@login_required
+def goto():
+    user_id = current_user.get_id()
+    des = int(request.form['goto']) - 1
+    if des < 0:
+        des = 0
+
+    user = db.session.get(User, current_user.id)
+    user.currently_labeling = des
+    db.session.commit()
+
+    return jsonify({'result': 'success'})
+
+
+@app.route('/goto_first_unlabeled', methods=['GET', 'POST'])
+@login_required
+def goto_first_unlabeled():
+    user_id = current_user.get_id()
+    user = db.session.get(User, current_user.id)
+    labeled_csv_path = f'labeled_data/{user_id}.csv'
+
+    # Load existing data
+    if os.path.exists(labeled_csv_path):
+        df = pd.read_csv(labeled_csv_path)
+    else:
+        df = pd.read_csv(f'raw_data/{user_id}.csv')
+        df['Label'] = None
+        user.currently_labeling = 0
+        db.session.commit()
+        return jsonify({'result': 'success'})
+
+    # Column to check for null values
+    column_to_check = 'Label'
+
+    # Find the first row where the column is null
+    if df[column_to_check].isnull().any():
+        first_null_row_index = df[column_to_check].isnull().idxmax()
+        user.currently_labeling = int(df.loc[first_null_row_index, 'Index'] - df['Index'].iloc[0])
+    else:
+        user.currently_labeling = len(df)
+    db.session.commit()
+    del df
+    return jsonify({'result': 'success'})
+
+
+@app.route('/forward', methods=['GET', 'POST'])
+@login_required
+def forward():
+    user = db.session.get(User, current_user.id)
+    des = int(user.currently_labeling) + 1
+    if des < 0:
+        des = 0
+
+    user.currently_labeling = des
+    db.session.commit()
+
+    return jsonify({'result': 'success'})
+
+
+@app.route('/backward', methods=['GET', 'POST'])
+@login_required
+def backward():
+    user = db.session.get(User, current_user.id)
+    des = int(user.currently_labeling) - 1
+    if des < 0:
+        des = 0
+
+    user.currently_labeling = des
+    db.session.commit()
+
+    if request.method == "GET":
+        return redirect("/", code=307)
     return jsonify({'result': 'success'})
 
 

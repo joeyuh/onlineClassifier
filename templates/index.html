@@ -37,6 +37,7 @@
             justify-content: space-between;
             margin-bottom: 10px;
         }
+
         .nav-button {
             width: 30px;
             height: 30px;
@@ -46,6 +47,7 @@
             justify-content: center;
             align-items: center;
         }
+
         #textToLabel {
             min-height: 150px;
             margin-bottom: 20px;
@@ -54,15 +56,42 @@
             background-color: #fafafa;
         }
 
+        #lastLabeled {
+            margin-bottom: 20px;
+        }
+
         #labelButtons {
             display: flex;
             justify-content: space-between;
         }
 
+        .goto-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .goto-container input {
+            width: 80px;
+            height: 30px;
+            font-size: 16px;
+            text-align: center;
+            padding: 0; /* Remove any default padding */
+            border: 1px solid #ccc; /* Adjust border to match other elements */
+        }
+
+        .next-unlabeled-button {
+            height: 30px;
+            font-size: 16px;
+            white-space: nowrap;
+            padding: 5px 10px;
+            width: auto;
+        }
+
         button {
             width: 15%;
             padding: 10px;
-            font-size: 16px;
+            font-size: 13px;
             cursor: pointer;
         }
 
@@ -104,6 +133,11 @@
 
     <div id="navigationButtons">
         <button class="nav-button" onclick="navigateBackward()">&#9664;</button>
+        <div class="goto-container">
+            <input type="text" id="gotoInput" placeholder="#"/>
+            <button class="nav-button" onclick="navigateTo()">Go</button>
+        </div>
+        <button class="next-unlabeled-button" onclick="navigateFirstUnlabeled()">Next Unlabled&#9197;</button>
         <button class="nav-button" onclick="navigateForward()">&#9654;</button>
     </div>
 
@@ -111,12 +145,14 @@
         <p>{{ text_paragraph }}</p>
     </div>
 
+    <div id="lastLabeled">Last Labeled as: {{ last_labeled_as }}</div>
+
     <div id="labelButtons">
-        <button onclick="postLabel(1)">1</button>
-        <button onclick="postLabel(2)">2</button>
-        <button onclick="postLabel(3)">3</button>
-        <button onclick="postLabel(4)">4</button>
-        <button onclick="postLabel(5)">5</button>
+        <button onclick="postLabel(1)">Joy, Optimistic</button>
+        <button onclick="postLabel(2)">Anger, Frustrated</button>
+        <button onclick="postLabel(3)">Sadness, Depressed</button>
+        <button onclick="postLabel(4)">Confuse, Worried</button>
+        <button onclick="postLabel(5)">Neutral Emotion</button>
         <button onclick="postLabel(0)">Not Dream</button>
     </div>
 </div>
@@ -132,7 +168,6 @@
             body: 'label=' + label
         }).then(response => {
             if (response.ok) {
-                console.log('Label posted successfully');
                 location.reload();
             } else {
                 console.error('Failed to post label');
@@ -143,16 +178,77 @@
     }
 
     function navigateForward() {
-        // Implement the forward navigation logic here
-        console.log('Navigating forward');
+        fetch('/forward', {
+            method: 'POST',
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                console.error('Failed to forward');
+            }
+        }).catch(error => {
+            console.error('Error:', error);
+        });
     }
 
     function navigateBackward() {
-        // Implement the backward navigation logic here
-        console.log('Navigating backward');
+        fetch('/backward', {
+            method: 'POST',
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                console.error('Failed to backward');
+            }
+        }).catch(error => {
+            console.error('Error:', error);
+        });
     }
+
+    function navigateTo() {
+        const taskNumber = document.getElementById('gotoInput').value;
+        if (taskNumber) {
+            fetch('/goto', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'goto=' + taskNumber
+            }).then(response => {
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    console.error('Failed to goto label');
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    }
+
+    function navigateFirstUnlabeled() {
+        fetch('/goto_first_unlabeled', {
+            method: 'POST',
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                console.error('Failed to goto first unlabeled');
+            }
+        }).catch(error => {
+            console.error('Error:', error);
+        });
+    }
+
+
     document.addEventListener('keydown', function (event) {
         const key = event.key;
+        const activeElement = document.activeElement;
+
+        if (activeElement.tagName === 'INPUT' && activeElement.type === 'text') {
+            // Ignore key events when typing in the input box
+            return;
+        }
         if (key >= '0' && key <= '5') {
             postLabel(key);
         } else if (key === 'ArrowRight') {
